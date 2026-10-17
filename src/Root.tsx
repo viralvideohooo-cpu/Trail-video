@@ -32,7 +32,7 @@ const CyberGrid: React.FC<{ color: string }> = ({ color }) => {
 };
 
 // Word-by-Word Pop Subtitle
-constProCaption: React.FC<{ words: string[]; activeIndex: number; accent: string }> = ({
+const TheProCaption: React.FC<{ words: string[]; activeIndex: number; accent: string }> = ({
   words,
   activeIndex,
   accent,
@@ -88,7 +88,6 @@ const Scene1: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Smooth zoom-in on speaker at first, then pull back into 3D tilted card at frame 85
   const cardTransition = spring({ frame: frame - 85, fps, config: { damping: 14 } });
   const zoom = interpolate(frame, [0, 85], [1, 1.08], { extrapolateRight: 'clamp' });
 
@@ -106,7 +105,6 @@ const Scene1: React.FC = () => {
     <AbsoluteFill style={{ perspective: 1400 }}>
       <CyberGrid color="#38bdf8" />
 
-      {/* 3D Tilted Speaker Frame */}
       <div
         style={{
           position: 'absolute',
@@ -128,7 +126,6 @@ const Scene1: React.FC = () => {
         />
       </div>
 
-      {/* Right 3D Animated AI Core Graphic */}
       {frame > 85 && (
         <div
           style={{
@@ -179,7 +176,6 @@ const Scene1: React.FC = () => {
               Transforming your everyday phone into a proactive neural assistant.
             </div>
 
-            {/* Animated Neural Wave Bars */}
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: 80 }}>
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((bar) => {
                 const h = 25 + Math.abs(Math.sin((frame + bar * 6) / 6)) * 55;
@@ -233,7 +229,6 @@ const Scene2: React.FC = () => {
     <AbsoluteFill>
       <CyberGrid color="#a855f7" />
 
-      {/* Circular Floating Speaker Badge on Left */}
       <div
         style={{
           position: 'absolute',
@@ -254,7 +249,6 @@ const Scene2: React.FC = () => {
         />
       </div>
 
-      {/* Right Side: Blur-to-Focus 2x2 Grid (Vivek 00:09:18 Pattern) */}
       <div
         style={{
           position: 'absolute',
@@ -274,7 +268,7 @@ const Scene2: React.FC = () => {
             <div
               key={idx}
               style={{
-                opacity: interpolate(pop, [0, 1], [0, isFocused ? 1 : 0.4]),
+                opacity: interpolate(pop, [0, 1], [0, isFocused ? 1 : 0.35]),
                 filter: isFocused ? 'blur(0px)' : 'blur(4px)',
                 transform: `scale(${isFocused ? 1.06 : 0.94})`,
                 background: isFocused
@@ -352,7 +346,6 @@ const Scene3: React.FC = () => {
         />
       </div>
 
-      {/* Right Side Animated Progress Meters */}
       <div style={{ position: 'absolute', right: 80, top: 170, width: 840 }}>
         <div style={{ color: '#10b981', fontSize: 24, fontWeight: 900, letterSpacing: 3, fontFamily: 'sans-serif' }}>
           LOW-LIGHT NEURAL ENGINE
@@ -427,7 +420,6 @@ const Scene4: React.FC = () => {
     <AbsoluteFill>
       <CyberGrid color="#6366f1" />
 
-      {/* Top Center Speaker PIP Banner */}
       <div
         style={{
           position: 'absolute',
@@ -448,7 +440,6 @@ const Scene4: React.FC = () => {
         />
       </div>
 
-      {/* Bottom Full-Width Connected Node Pipeline (Vivek 00:10:07 Pattern) */}
       <div
         style={{
           position: 'absolute',
@@ -515,9 +506,6 @@ const Scene4: React.FC = () => {
   );
 };
 
-const TheProCaption = constProCaption;
-
-// Master Timeline (Extended scene durations so NO words get cut off!)
 export const MainVideo: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: '#030712' }}>
@@ -551,3 +539,4 @@ export const RemotionRoot: React.FC = () => {
     </>
   );
 };
+        
