@@ -3,540 +3,682 @@ import {
   AbsoluteFill,
   Composition,
   Sequence,
-  OffthreadVideo,
-  staticFile,
   useCurrentFrame,
   useVideoConfig,
   spring,
   interpolate,
 } from 'remotion';
 
-// Animated Moving Grid Background (Vivek Style)
-const CyberGrid: React.FC<{ color: string }> = ({ color }) => {
+// Free Real Satellite Aerial Map Background (Jaipur - Jhotwara / Benad Rd Area)
+// Uses multi-tile Esri World Imagery with 3D Drone Camera Perspective
+const DroneSatelliteView: React.FC<{
+  zoomStart: number;
+  zoomEnd: number;
+  rotateStart: number;
+  rotateEnd: number;
+  panX?: number;
+  panY?: number;
+  pitch?: number;
+  tileOffsetX?: number;
+  tileOffsetY?: number;
+}> = ({
+  zoomStart,
+  zoomEnd,
+  rotateStart,
+  rotateEnd,
+  panX = 0,
+  panY = 0,
+  pitch = 48,
+  tileOffsetX = 0,
+  tileOffsetY = 0,
+}) => {
   const frame = useCurrentFrame();
-  const offset = (frame * 1.5) % 60;
+  const { durationInFrames } = useVideoConfig();
+
+  const scale = interpolate(frame, [0, durationInFrames], [zoomStart, zoomEnd], {
+    extrapolateRight: 'clamp',
+  });
+  const rotateZ = interpolate(frame, [0, durationInFrames], [rotateStart, rotateEnd], {
+    extrapolateRight: 'clamp',
+  });
+
+  // Zoom 18 Satellite Tiles covering Nadi Ka Phatak / Benad Road, Jhotwara, Jaipur (26.9685N, 75.7485E)
+  const baseTileX = 186220 + tileOffsetX;
+  const baseTileY = 110682 + tileOffsetY;
+  const grid = [-2, -1, 0, 1, 2];
+
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: '#030712',
-        backgroundImage: `
-          radial-gradient(circle at 50% 30%, ${color}25 0%, transparent 65%),
-          linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px),
-          linear-gradient(to bottom, rgba(255,255,255,0.04) 1px, transparent 1px)
-        `,
-        backgroundSize: '100% 100%, 60px 60px, 60px 60px',
-        backgroundPosition: `0 0, ${offset}px ${offset}px, ${offset}px ${offset}px`,
-      }}
-    />
+    <AbsoluteFill style={{ backgroundColor: '#1a2418', overflow: 'hidden', perspective: 1200 }}>
+      <div
+        style={{
+          position: 'absolute',
+          width: 2560,
+          height: 2560,
+          left: '50%',
+          top: '50%',
+          marginLeft: -1280 + panX,
+          marginTop: -1280 + panY,
+          transform: `rotateX(${pitch}deg) rotateZ(${rotateZ}deg) scale(${scale})`,
+          transformStyle: 'preserve-3d',
+          filter: 'contrast(1.18) saturate(1.25) brightness(0.95)',
+        }}
+      >
+        {grid.map((dy) =>
+          grid.map((dx) => (
+            <img
+              key={`${dx}-${dy}`}
+              src={`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/18/${
+                baseTileY + dy
+              }/${baseTileX + dx}`}
+              style={{
+                position: 'absolute',
+                left: (dx + 2) * 512,
+                top: (dy + 2) * 512,
+                width: 513,
+                height: 513,
+                objectFit: 'cover',
+              }}
+            />
+          ))
+        )}
+      </div>
+      {/* Subtle Aerial Atmospheric Vignette */}
+      <AbsoluteFill
+        style={{
+          background:
+            'radial-gradient(circle at center, transparent 55%, rgba(0,0,0,0.55) 100%)',
+          pointerEvents: 'none',
+        }}
+      />
+    </AbsoluteFill>
   );
 };
 
-// Word-by-Word Pop Subtitle
-const TheProCaption: React.FC<{ words: string[]; activeIndex: number; accent: string }> = ({
-  words,
-  activeIndex,
-  accent,
+// Reusable 3D Isometric Extruded White Text (Exact Reference Video Style)
+const Isometric3DText: React.FC<{
+  lines: string[];
+  fontSize?: number;
+  rotateZ?: number;
+  rotateX?: number;
+  top?: number;
+  left?: number;
+  accentLineIndex?: number;
+  accentColor?: string;
+}> = ({
+  lines,
+  fontSize = 105,
+  rotateZ = -28,
+  rotateX = 35,
+  top = 680,
+  left = 140,
+  accentLineIndex = -1,
+  accentColor = '#facc15',
 }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const pop = spring({ frame: frame - 8, fps, config: { damping: 12, mass: 0.9 } });
+
   return (
     <div
       style={{
         position: 'absolute',
-        bottom: 50,
+        top,
+        left,
+        transform: `perspective(1000px) rotateX(${rotateX}deg) rotateZ(${rotateZ}deg) scale(${pop})`,
+        transformOrigin: 'center center',
+        zIndex: 30,
+      }}
+    >
+      {lines.map((line, idx) => {
+        const isAccent = idx === accentLineIndex;
+        return (
+          <div
+            key={idx}
+            style={{
+              fontFamily: 'Impact, Arial Black, sans-serif',
+              fontSize,
+              fontWeight: 900,
+              lineHeight: 1.02,
+              color: isAccent ? accentColor : '#ffffff',
+              textAlign: 'center',
+              letterSpacing: -1,
+              textShadow: `
+                0px 2px 0px #cbd5e1,
+                0px 4px 0px #94a3b8,
+                0px 6px 0px #64748b,
+                0px 8px 0px #475569,
+                0px 10px 0px #1e293b,
+                0px 18px 30px rgba(0,0,0,0.85)
+              `,
+            }}
+          >
+            {line}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Glowing Yellow 3D Building Polygon Overlay (Exact Reference Video Style)
+const GlowingPropertyPolygon: React.FC<{
+  scale?: number;
+  rotateZ?: number;
+  showRoofNumbers?: boolean;
+  borderOnlyFirst?: boolean;
+}> = ({ scale = 1, rotateZ = -28, showRoofNumbers = false, borderOnlyFirst = false }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const pop = spring({ frame: frame - 5, fps, config: { damping: 14 } });
+  const fillOpacity = borderOnlyFirst
+    ? interpolate(frame, [12, 28], [0, 0.58], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(pop, [0, 1], [0, 0.58]);
+
+  const num1Pop = spring({ frame: frame - 40, fps, config: { damping: 11 } });
+  const num2Pop = spring({ frame: frame - 55, fps, config: { damping: 11 } });
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: '50%',
+        top: '52%',
+        width: 680,
+        height: 460,
+        marginLeft: -340,
+        marginTop: -230,
+        transform: `perspective(1000px) rotateX(45deg) rotateZ(${rotateZ}deg) scale(${scale * pop})`,
+        zIndex: 15,
+      }}
+    >
+      <svg width="680" height="460" viewBox="0 0 680 460" style={{ overflow: 'visible' }}>
+        <defs>
+          <filter id="neonGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="12" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* 3D Extruded Side Walls of Hotel Tanwar Building */}
+        <polygon
+          points="70,120 470,120 470,220 610,220 610,390 470,440 70,340 70,190"
+          fill={`rgba(234, 255, 0, ${fillOpacity * 0.75})`}
+          stroke="#ffffff"
+          strokeWidth="4"
+        />
+
+        {/* Top Roof L-Shape Polygon */}
+        <polygon
+          points="70,60 470,60 470,160 610,160 610,330 70,330"
+          fill={`rgba(238, 255, 20, ${fillOpacity})`}
+          stroke="#ffffff"
+          strokeWidth="8"
+          filter="url(#neonGlow)"
+        />
+      </svg>
+
+      {/* Blue 3D Numbers "1" and "2" on Roof (For 2 Big Halls - 00:15 Reference) */}
+      {showRoofNumbers && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              left: 145,
+              top: 95,
+              transform: `scale(${num1Pop}) rotateZ(15deg)`,
+              fontFamily: 'Impact, Arial Black, sans-serif',
+              fontSize: 165,
+              fontWeight: 900,
+              color: '#2563eb',
+              textShadow: '0 8px 0 #1e3a8a, 0 14px 25px rgba(0,0,0,0.7)',
+            }}
+          >
+            1
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              left: 365,
+              top: 125,
+              transform: `scale(${num2Pop}) rotateZ(15deg)`,
+              fontFamily: 'Impact, Arial Black, sans-serif',
+              fontSize: 165,
+              fontWeight: 900,
+              color: '#2563eb',
+              textShadow: '0 8px 0 #1e3a8a, 0 14px 25px rgba(0,0,0,0.7)',
+            }}
+          >
+            2
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// Top Location Header Badge
+const PropertyHeaderBadge: React.FC<{ subtitle: string }> = ({ subtitle }) => {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 70,
         width: '100%',
         display: 'flex',
-        justifyContent: 'center',
+        flexDirection: 'column',
+        alignItems: 'center',
         zIndex: 50,
       }}
     >
       <div
         style={{
-          background: 'rgba(9, 13, 26, 0.92)',
-          border: `2px solid ${accent}66`,
-          padding: '16px 38px',
+          background: 'rgba(15, 23, 42, 0.88)',
+          border: '2px solid rgba(250, 204, 21, 0.7)',
+          padding: '12px 32px',
           borderRadius: 999,
-          display: 'flex',
-          gap: 14,
-          boxShadow: `0 15px 45px rgba(0,0,0,0.8), 0 0 25px ${accent}33`,
+          color: '#facc15',
+          fontSize: 28,
+          fontWeight: 900,
+          fontFamily: 'sans-serif',
+          letterSpacing: 2,
+          boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
         }}
       >
-        {words.map((w, i) => {
-          const isCurrent = i === activeIndex;
-          return (
-            <span
-              key={i}
-              style={{
-                fontFamily: 'sans-serif',
-                fontSize: 38,
-                fontWeight: 900,
-                color: isCurrent ? accent : '#f8fafc',
-                transform: isCurrent ? 'scale(1.12) translateY(-3px)' : 'scale(1)',
-                textShadow: isCurrent ? `0 0 20px ${accent}` : 'none',
-                display: 'inline-block',
-              }}
-            >
-              {w}
-            </span>
-          );
-        })}
+        📍 HOTEL TANWAR • JHOTWARA, JAIPUR
+      </div>
+      <div
+        style={{
+          marginTop: 10,
+          color: '#ffffff',
+          fontSize: 24,
+          fontWeight: 700,
+          fontFamily: 'sans-serif',
+          textShadow: '0 2px 10px rgba(0,0,0,0.9)',
+        }}
+      >
+        {subtitle}
       </div>
     </div>
   );
 };
 
-// SCENE 1: Dynamic Camera Zoom + 3D Floating Glass Overlay (11.mp4)
+// SCENE 1 (0-3s): Close-up Yellow Building + "Plot No. 80" (Matches "29 cents" at 00:00)
 const Scene1: React.FC = () => {
+  return (
+    <AbsoluteFill>
+      <DroneSatelliteView zoomStart={1.35} zoomEnd={1.55} rotateStart={-12} rotateEnd={-22} />
+      <PropertyHeaderBadge subtitle="Plot No. 80, 6-A, Ganesh Nagar, Benad Rd" />
+      <GlowingPropertyPolygon scale={1.15} rotateZ={-32} />
+      <Isometric3DText lines={['Plot No. 80']} fontSize={110} rotateZ={-32} top={760} left={210} />
+    </AbsoluteFill>
+  );
+};
+
+// SCENE 2 (3-6s): Medium Aerial Orbit + "20 Rooms" (Matches "57 Rooms" at 00:03)
+const Scene2: React.FC = () => {
+  return (
+    <AbsoluteFill>
+      <DroneSatelliteView zoomStart={1.15} zoomEnd={0.95} rotateStart={-22} rotateEnd={-8} />
+      <PropertyHeaderBadge subtitle="Luxury Stay & Marriage Garden" />
+      <GlowingPropertyPolygon scale={0.85} rotateZ={-18} />
+      <Isometric3DText
+        lines={['20', 'Rooms']}
+        fontSize={130}
+        rotateZ={-18}
+        top={530}
+        left={280}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// SCENE 3 (6-10s): Outline to Fill + "2 Big Banquet Halls" (Matches "Monthly ₹2.5 lakh" at 00:06)
+const Scene3: React.FC = () => {
+  return (
+    <AbsoluteFill>
+      <DroneSatelliteView zoomStart={0.95} zoomEnd={1.1} rotateStart={10} rotateEnd={22} />
+      <PropertyHeaderBadge subtitle="Tanwar Vivah Garden • Open 24 Hours" />
+      <GlowingPropertyPolygon scale={0.82} rotateZ={-20} borderOnlyFirst />
+      <Isometric3DText
+        lines={['20 Rooms', '+ 2 Big', 'Banquet Halls']}
+        accentLineIndex={1}
+        accentColor="#facc15"
+        fontSize={96}
+        rotateZ={-20}
+        top={440}
+        left={160}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// SCENE 4 (10-20s): Roof Numbers "1" & "2" + Wide Neighborhood Pullback (Matches 00:10-00:20)
+const Scene4: React.FC = () => {
+  const frame = useCurrentFrame();
+  const isWidePullback = frame > 195;
+
+  return (
+    <AbsoluteFill>
+      <DroneSatelliteView
+        zoomStart={isWidePullback ? 0.78 : 1.25}
+        zoomEnd={isWidePullback ? 0.62 : 1.05}
+        rotateStart={isWidePullback ? 5 : -15}
+        rotateEnd={isWidePullback ? 18 : 0}
+        pitch={isWidePullback ? 58 : 44}
+      />
+      <PropertyHeaderBadge
+        subtitle={
+          isWidePullback
+            ? 'Prime Connectivity • Shankar Vihar Extension'
+            : 'Dual Hall Setup: Hall 1 & Hall 2'
+        }
+      />
+      <GlowingPropertyPolygon
+        scale={isWidePullback ? 0.45 : 1.05}
+        rotateZ={-15}
+        showRoofNumbers={!isWidePullback}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// SCENE 5 (20-25s): Blue Road Strip ("Benad Road") + "North / West" Facing (Matches 00:21-00:25)
+const Scene5: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const cardTransition = spring({ frame: frame - 85, fps, config: { damping: 14 } });
-  const zoom = interpolate(frame, [0, 85], [1, 1.08], { extrapolateRight: 'clamp' });
-
-  const width = interpolate(cardTransition, [0, 1], [1920, 860]);
-  const height = interpolate(cardTransition, [0, 1], [1080, 680]);
-  const left = interpolate(cardTransition, [0, 1], [0, 90]);
-  const top = interpolate(cardTransition, [0, 1], [0, 160]);
-  const rotateY = interpolate(cardTransition, [0, 1], [0, 12]);
-  const radius = interpolate(cardTransition, [0, 1], [0, 40]);
-
-  const badgePop = spring({ frame: frame - 95, fps, config: { damping: 12 } });
-  const orbPulse = Math.sin(frame / 8) * 10;
+  const roadSlide = spring({ frame: frame - 15, fps, config: { damping: 16 } });
+  const facingPop = spring({ frame: frame - 55, fps, config: { damping: 12 } });
 
   return (
-    <AbsoluteFill style={{ perspective: 1400 }}>
-      <CyberGrid color="#38bdf8" />
+    <AbsoluteFill>
+      <DroneSatelliteView zoomStart={1.15} zoomEnd={1.28} rotateStart={-10} rotateEnd={-4} />
+      <PropertyHeaderBadge subtitle="Direct Access from Main Benad Road" />
 
+      {/* Glowing Blue Road Strip (Matches "40-feet road" at 00:23) */}
       <div
         style={{
           position: 'absolute',
-          left,
-          top,
-          width,
-          height,
-          borderRadius: radius,
+          left: -120,
+          top: 980,
+          width: interpolate(roadSlide, [0, 1], [0, 1150]),
+          height: 150,
+          background: 'linear-gradient(90deg, rgba(37,99,235,0.92), rgba(59,130,246,0.82))',
+          borderTop: '5px solid #93c5fd',
+          borderBottom: '5px solid #93c5fd',
+          boxShadow: '0 0 45px rgba(37,99,235,0.9)',
+          transform: 'perspective(900px) rotateX(42deg) rotateZ(34deg)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           overflow: 'hidden',
-          transform: `scale(${cardTransition < 0.05 ? zoom : 1}) rotateY(${rotateY}deg)`,
-          border: cardTransition > 0.1 ? '3px solid #38bdf8' : 'none',
-          boxShadow: cardTransition > 0.1 ? '0 30px 80px rgba(0,0,0,0.85), 0 0 40px rgba(56,189,248,0.3)' : 'none',
+          zIndex: 25,
         }}
       >
-        <OffthreadVideo
-          src={staticFile('11.mp4')}
-          startFrom={18}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+        <span
+          style={{
+            color: '#ffffff',
+            fontFamily: 'Impact, Arial Black, sans-serif',
+            fontSize: 78,
+            fontWeight: 900,
+            letterSpacing: 3,
+            whiteSpace: 'nowrap',
+            textShadow: '0 4px 15px rgba(0,0,0,0.6)',
+          }}
+        >
+          MAIN BENAD ROAD
+        </span>
       </div>
 
-      {frame > 85 && (
+      {/* Building Box with "North" & "West" 3D Corner Labels (Matches 00:24) */}
+      <GlowingPropertyPolygon scale={0.9} rotateZ={-24} />
+
+      {frame > 50 && (
         <div
           style={{
             position: 'absolute',
-            right: 90,
-            top: 170,
-            width: 820,
-            transform: `scale(${badgePop}) translateX(${interpolate(badgePop, [0, 1], [120, 0])}px)`,
-            opacity: badgePop,
+            left: 330,
+            top: 690,
+            transform: `perspective(900px) rotateX(40deg) rotateZ(-24deg) scale(${facingPop})`,
+            zIndex: 35,
           }}
         >
           <div
             style={{
-              background: 'linear-gradient(135deg, rgba(15,23,42,0.9), rgba(30,41,59,0.7))',
-              border: '2px solid rgba(56,189,248,0.5)',
-              borderRadius: 36,
-              padding: 48,
-              boxShadow: '0 30px 70px rgba(0,0,0,0.7)',
+              color: '#ffffff',
+              fontFamily: 'Impact, Arial Black, sans-serif',
+              fontSize: 82,
+              textShadow: '0 6px 0 #334155, 0 12px 20px rgba(0,0,0,0.85)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginBottom: 28 }}>
-              <div
-                style={{
-                  width: 90,
-                  height: 90,
-                  borderRadius: 28,
-                  background: 'linear-gradient(135deg, #0284c7, #38bdf8)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 48,
-                  boxShadow: `0 0 ${30 + orbPulse}px #38bdf8`,
-                }}
-              >
-                ⚡
-              </div>
-              <div>
-                <div style={{ color: '#38bdf8', fontSize: 22, fontWeight: 800, letterSpacing: 3, fontFamily: 'sans-serif' }}>
-                  SYSTEM UPGRADE
-                </div>
-                <div style={{ color: '#fff', fontSize: 48, fontWeight: 900, fontFamily: 'sans-serif' }}>
-                  AI Core Active
-                </div>
-              </div>
-            </div>
-
-            <div style={{ color: '#cbd5e1', fontSize: 28, lineHeight: 1.4, fontFamily: 'sans-serif', marginBottom: 32 }}>
-              Transforming your everyday phone into a proactive neural assistant.
-            </div>
-
-            <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', height: 80 }}>
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((bar) => {
-                const h = 25 + Math.abs(Math.sin((frame + bar * 6) / 6)) * 55;
-                return (
-                  <div
-                    key={bar}
-                    style={{
-                      flex: 1,
-                      height: h,
-                      borderRadius: 99,
-                      background: 'linear-gradient(to top, #0284c7, #38bdf8)',
-                    }}
-                  />
-                );
-              })}
-            </div>
+            West
+          </div>
+          <div
+            style={{
+              color: '#facc15',
+              fontFamily: 'Impact, Arial Black, sans-serif',
+              fontSize: 92,
+              marginTop: 20,
+              marginLeft: 90,
+              textShadow: '0 6px 0 #334155, 0 12px 20px rgba(0,0,0,0.85)',
+            }}
+          >
+            North
           </div>
         </div>
       )}
-
-      {frame < 90 ? (
-        <TheProCaption
-          words={['Your', 'smartphone', 'is', 'SMARTER', 'than', 'you', 'think']}
-          activeIndex={Math.floor(interpolate(frame, [0, 85], [0, 6], { extrapolateRight: 'clamp' }))}
-          accent="#38bdf8"
-        />
-      ) : (
-        <TheProCaption
-          words={['AI', 'is', 'changing', 'how', 'we', 'use', 'it', 'EVERY', 'DAY']}
-          activeIndex={Math.floor(interpolate(frame, [90, 210], [0, 8], { extrapolateRight: 'clamp' }))}
-          accent="#38bdf8"
-        />
-      )}
     </AbsoluteFill>
   );
 };
 
-// SCENE 2: Vivek's "Blur-to-Focus" 4-Card Spotlight System (12.mp4)
-const Scene2: React.FC = () => {
+// SCENE 6 (25-28s): Nearby Hospital + 3D Red Pin & Green Radar Waves (Matches 00:26-00:28)
+const Scene6: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const items = [
-    { num: '01', title: 'Summarize Info', desc: 'Instant key notes', start: 20, end: 68, color: '#a855f7' },
-    { num: '02', title: 'Improve Photos', desc: 'Neural HDR boost', start: 68, end: 112, color: '#ec4899' },
-    { num: '03', title: 'Translate Live', desc: 'Real-time voice AI', start: 112, end: 160, color: '#3b82f6' },
-    { num: '04', title: 'Everyday Tasks', desc: '10x faster workflow', start: 160, end: 245, color: '#10b981' },
-  ];
+  const pinDrop = spring({ frame: frame - 10, fps, config: { damping: 10, mass: 0.9 } });
+  const pulse1 = (frame % 45) / 45;
+  const pulse2 = ((frame + 22) % 45) / 45;
 
   return (
     <AbsoluteFill>
-      <CyberGrid color="#a855f7" />
-
-      <div
-        style={{
-          position: 'absolute',
-          left: 80,
-          top: 170,
-          width: 680,
-          height: 680,
-          borderRadius: 48,
-          overflow: 'hidden',
-          border: '4px solid rgba(168,85,247,0.7)',
-          boxShadow: '0 25px 70px rgba(0,0,0,0.85), 0 0 40px rgba(168,85,247,0.3)',
-        }}
-      >
-        <OffthreadVideo
-          src={staticFile('12.mp4')}
-          startFrom={15}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      </div>
-
-      <div
-        style={{
-          position: 'absolute',
-          right: 70,
-          top: 165,
-          width: 980,
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: 28,
-        }}
-      >
-        {items.map((item, idx) => {
-          const pop = spring({ frame: frame - idx * 12, fps, config: { damping: 14 } });
-          const isFocused = frame >= item.start && frame < item.end;
-
-          return (
-            <div
-              key={idx}
-              style={{
-                opacity: interpolate(pop, [0, 1], [0, isFocused ? 1 : 0.35]),
-                filter: isFocused ? 'blur(0px)' : 'blur(4px)',
-                transform: `scale(${isFocused ? 1.06 : 0.94})`,
-                background: isFocused
-                  ? `linear-gradient(135deg, ${item.color}44, rgba(15,23,42,0.95))`
-                  : 'rgba(15,23,42,0.7)',
-                border: isFocused ? `3px solid ${item.color}` : '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 32,
-                padding: 36,
-                boxShadow: isFocused ? `0 20px 50px ${item.color}55` : 'none',
-              }}
-            >
-              <div
-                style={{
-                  color: item.color,
-                  fontSize: 28,
-                  fontWeight: 900,
-                  fontFamily: 'sans-serif',
-                  marginBottom: 12,
-                }}
-              >
-                STEP {item.num}
-              </div>
-              <div style={{ color: '#fff', fontSize: 38, fontWeight: 900, fontFamily: 'sans-serif' }}>
-                {item.title}
-              </div>
-              <div style={{ color: '#94a3b8', fontSize: 24, marginTop: 10, fontFamily: 'sans-serif' }}>
-                {item.desc}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <TheProCaption
-        words={['Summarize,', 'Improve', 'Photos,', 'Translate', '&', 'Automate']}
-        activeIndex={Math.floor(interpolate(frame, [15, 220], [0, 5], { extrapolateRight: 'clamp' }))}
-        accent="#c084fc"
+      <DroneSatelliteView
+        zoomStart={1.05}
+        zoomEnd={1.25}
+        rotateStart={8}
+        rotateEnd={16}
+        tileOffsetX={1}
+        tileOffsetY={-1}
       />
-    </AbsoluteFill>
-  );
-};
+      <PropertyHeaderBadge subtitle="800m to Mahadev & Metro City Hospital" />
 
-// SCENE 3: Live Animated Metering Bars + Camera HUD (14.mp4)
-const Scene3: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-
-  const meters = [
-    { label: 'BRIGHTEN DETAILS', val: 88, start: 75, color: '#34d399' },
-    { label: 'NOISE REDUCTION', val: 94, start: 120, color: '#38bdf8' },
-    { label: 'CLARITY & SHARPNESS', val: 99, start: 165, color: '#facc15' },
-  ];
-
-  return (
-    <AbsoluteFill>
-      <CyberGrid color="#10b981" />
-
+      {/* Pulsing Green Radar Target Rings */}
       <div
         style={{
           position: 'absolute',
-          left: 80,
-          top: 150,
-          width: 820,
-          height: 720,
-          borderRadius: 40,
-          overflow: 'hidden',
-          border: '3px solid #10b981',
-          boxShadow: '0 25px 70px rgba(0,0,0,0.85)',
+          left: '50%',
+          top: '48%',
+          width: 420,
+          height: 420,
+          marginLeft: -210,
+          marginTop: -210,
+          transform: 'rotateX(55deg)',
+          zIndex: 20,
         }}
       >
-        <OffthreadVideo
-          src={staticFile('14.mp4')}
-          startFrom={15}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
+        {[pulse1, pulse2].map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              borderRadius: '50%',
+              border: '8px solid #a3e635',
+              background: 'rgba(163, 230, 53, 0.22)',
+              transform: `scale(${0.2 + p * 1.1})`,
+              opacity: 1 - p,
+              boxShadow: '0 0 30px #84cc16',
+            }}
+          />
+        ))}
       </div>
 
-      <div style={{ position: 'absolute', right: 80, top: 170, width: 840 }}>
-        <div style={{ color: '#10b981', fontSize: 24, fontWeight: 900, letterSpacing: 3, fontFamily: 'sans-serif' }}>
-          LOW-LIGHT NEURAL ENGINE
+      {/* 3D Red Location Pin Dropping In */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '34%',
+          marginLeft: -85,
+          transform: `translateY(${interpolate(pinDrop, [0, 1], [-300, 0])}px) scale(${pinDrop})`,
+          zIndex: 30,
+          filter: 'drop-shadow(0 25px 25px rgba(0,0,0,0.85))',
+        }}
+      >
+        <svg width="170" height="220" viewBox="0 0 170 220">
+          <path
+            d="M85 0C38 0 0 38 0 85c0 63 85 135 85 135s85-72 85-135C170 38 132 0 85 0z"
+            fill="#ef4444"
+          />
+          <circle cx="85" cy="82" r="34" fill="#7f1d1d" />
+        </svg>
+      </div>
+
+      {/* Serif Italic 3D Hospital Title (Matches "Government Hospital" at 00:27) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 980,
+          width: '100%',
+          textAlign: 'center',
+          transform: `rotateZ(-12deg) scale(${pinDrop})`,
+          zIndex: 35,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontStyle: 'italic',
+            fontWeight: 900,
+            fontSize: 105,
+            lineHeight: 0.98,
+            color: '#ffffff',
+            textShadow: '0 8px 0 #1e293b, 0 18px 35px rgba(0,0,0,0.95)',
+          }}
+        >
+          Mahadev & Metro
+          <br />
+          Hospital
         </div>
-        <div style={{ color: '#fff', fontSize: 54, fontWeight: 900, fontFamily: 'sans-serif', marginBottom: 36 }}>
-          Real-Time Image Fix
-        </div>
-
-        {meters.map((m, i) => {
-          const prog = spring({ frame: frame - m.start, fps, config: { damping: 18 } });
-          const currentNum = Math.round(interpolate(prog, [0, 1], [0, m.val]));
-
-          return (
-            <div
-              key={i}
-              style={{
-                background: 'rgba(15,23,42,0.85)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 28,
-                padding: '28px 34px',
-                marginBottom: 24,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-                <span style={{ color: '#f8fafc', fontSize: 28, fontWeight: 800, fontFamily: 'sans-serif' }}>
-                  {m.label}
-                </span>
-                <span style={{ color: m.color, fontSize: 32, fontWeight: 900, fontFamily: 'sans-serif' }}>
-                  +{currentNum}%
-                </span>
-              </div>
-              <div style={{ width: '100%', height: 20, background: '#1e293b', borderRadius: 99, overflow: 'hidden' }}>
-                <div
-                  style={{
-                    width: `${currentNum}%`,
-                    height: '100%',
-                    background: m.color,
-                    borderRadius: 99,
-                    boxShadow: `0 0 20px ${m.color}`,
-                  }}
-                />
-              </div>
-            </div>
-          );
-        })}
       </div>
-
-      <TheProCaption
-        words={['Brighten', 'Details,', 'Reduce', 'Noise', '&', 'Boost', 'Clarity']}
-        activeIndex={Math.floor(interpolate(frame, [60, 225], [0, 6], { extrapolateRight: 'clamp' }))}
-        accent="#34d399"
-      />
     </AbsoluteFill>
   );
 };
 
-// SCENE 4: Vivek's "Second Brain" Connected Node Flow (15.mp4)
-const Scene4: React.FC = () => {
+// SCENE 7 (28-33s): Speed-Ramp Zoom + Landmark Circle Text (Matches "ANANTAPUR TOWER CLOCK" at 00:29)
+const Scene7: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const line1 = spring({ frame: frame - 65, fps, config: { damping: 20 } });
-  const line2 = spring({ frame: frame - 125, fps, config: { damping: 20 } });
-
-  const nodes = [
-    { title: 'Recognize Patterns', sub: 'Visual & habit scan', frameStart: 20, color: '#38bdf8' },
-    { title: 'Understand Context', sub: 'Deep neural linking', frameStart: 75, color: '#818cf8' },
-    { title: 'Instant Answers', sub: 'Everyday solutions', frameStart: 135, color: '#f472b6' },
-  ];
+  // Fast speed-ramp zoom blur during first 10 frames (00:28 transition)
+  const speedRamp = spring({ frame, fps, config: { damping: 14, mass: 0.6 } });
+  const blurAmount = interpolate(frame, [0, 12], [18, 0], { extrapolateRight: 'clamp' });
 
   return (
-    <AbsoluteFill>
-      <CyberGrid color="#6366f1" />
-
-      <div
-        style={{
-          position: 'absolute',
-          top: 60,
-          left: 710,
-          width: 500,
-          height: 320,
-          borderRadius: 32,
-          overflow: 'hidden',
-          border: '3px solid #818cf8',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.8)',
-        }}
-      >
-        <OffthreadVideo
-          src={staticFile('15.mp4')}
-          startFrom={15}
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      </div>
-
-      <div
-        style={{
-          position: 'absolute',
-          top: 470,
-          left: 100,
-          right: 100,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        {nodes.map((n, i) => {
-          const pop = spring({ frame: frame - n.frameStart, fps, config: { damping: 13 } });
-          return (
-            <React.Fragment key={i}>
-              <div
-                style={{
-                  width: 460,
-                  padding: 36,
-                  borderRadius: 32,
-                  background: 'rgba(15,23,42,0.92)',
-                  border: `3px solid ${n.color}`,
-                  boxShadow: `0 0 40px ${n.color}44`,
-                  transform: `scale(${pop})`,
-                  opacity: pop,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ color: n.color, fontSize: 22, fontWeight: 900, marginBottom: 10, fontFamily: 'sans-serif' }}>
-                  STAGE 0{i + 1}
-                </div>
-                <div style={{ color: '#fff', fontSize: 34, fontWeight: 900, fontFamily: 'sans-serif' }}>
-                  {n.title}
-                </div>
-                <div style={{ color: '#94a3b8', fontSize: 22, marginTop: 8, fontFamily: 'sans-serif' }}>
-                  {n.sub}
-                </div>
-              </div>
-
-              {i < 2 && (
-                <div style={{ flex: 1, height: 8, background: '#1e293b', margin: '0 20px', borderRadius: 99 }}>
-                  <div
-                    style={{
-                      width: `${(i === 0 ? line1 : line2) * 100}%`,
-                      height: '100%',
-                      background: 'linear-gradient(90deg, #38bdf8, #f472b6)',
-                      borderRadius: 99,
-                      boxShadow: '0 0 20px #818cf8',
-                    }}
-                  />
-                </div>
-              )}
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      <TheProCaption
-        words={['Recognize', 'Patterns', '➔', 'Understand', 'Info', '➔', 'Useful', 'Answers']}
-        activeIndex={Math.floor(interpolate(frame, [20, 220], [0, 7], { extrapolateRight: 'clamp' }))}
-        accent="#818cf8"
+    <AbsoluteFill style={{ filter: `blur(${blurAmount}px)` }}>
+      <DroneSatelliteView
+        zoomStart={2.4}
+        zoomEnd={1.25}
+        rotateStart={-25}
+        rotateEnd={0}
+        pitch={35}
+        tileOffsetX={-1}
+        tileOffsetY={1}
       />
+      <PropertyHeaderBadge subtitle="1 Min from Nadi Ka Phatak & Benad Rd" />
+
+      {/* Central Landmark Highlight Ring */}
+      <div
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '44%',
+          width: 280,
+          height: 280,
+          marginLeft: -140,
+          marginTop: -140,
+          borderRadius: '50%',
+          border: '6px solid rgba(250, 204, 21, 0.85)',
+          boxShadow: '0 0 60px rgba(250, 204, 21, 0.6)',
+          transform: `scale(${speedRamp})`,
+        }}
+      />
+
+      {/* Bold Street Ground Text (Matches "ANANTAPUR TOWER CLOCK" at 00:30) */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 1120,
+          width: '100%',
+          textAlign: 'center',
+          transform: `perspective(800px) rotateX(28deg) scale(${speedRamp})`,
+          zIndex: 35,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'Impact, Arial Black, sans-serif',
+            fontSize: 98,
+            fontWeight: 900,
+            lineHeight: 0.96,
+            color: 'rgba(241, 245, 249, 0.92)',
+            letterSpacing: 3,
+            textShadow: '0 8px 0 #0f172a, 0 20px 40px rgba(0,0,0,0.9)',
+          }}
+        >
+          NADI KA PHATAK
+          <br />
+          JHOTWARA CIRCLE
+        </div>
+        <div
+          style={{
+            marginTop: 28,
+            display: 'inline-block',
+            background: '#facc15',
+            color: '#0f172a',
+            fontFamily: 'sans-serif',
+            fontSize: 34,
+            fontWeight: 900,
+            padding: '12px 36px',
+            borderRadius: 99,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.8)',
+          }}
+        >
+          HOTEL TANWAR • 20 ROOMS + 2 BIG HALLS
+        </div>
+      </div>
     </AbsoluteFill>
   );
 };
 
+// Master 33-Second Real Estate Reel (1080x1920 Vertical 9:16 @ 30fps = 990 Frames)
 export const MainVideo: React.FC = () => {
   return (
-    <AbsoluteFill style={{ backgroundColor: '#030712' }}>
-      <Sequence from={0} durationInFrames={240}>
+    <AbsoluteFill style={{ backgroundColor: '#0f172a' }}>
+      <Sequence from={0} durationInFrames={90}>
         <Scene1 />
       </Sequence>
-      <Sequence from={240} durationInFrames={255}>
+      <Sequence from={90} durationInFrames={90}>
         <Scene2 />
       </Sequence>
-      <Sequence from={495} durationInFrames={255}>
+      <Sequence from={180} durationInFrames={120}>
         <Scene3 />
       </Sequence>
-      <Sequence from={750} durationInFrames={255}>
+      <Sequence from={300} durationInFrames={300}>
         <Scene4 />
       </Sequence>
-    </AbsoluteFill>
-  );
-};
-
-export const RemotionRoot: React.FC = () => {
-  return (
-    <>
-      <Composition
-        id="HelloWorld"
-        component={MainVideo}
-        durationInFrames={1005}
-        fps={30}
-        width={1920}
-        height={1080}
-      />
-    </>
-  );
-};
-        
+      <Sequence from={600} durati
